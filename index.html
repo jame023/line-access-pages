@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang='th'>
+  <head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <title>จัดการผู้ใช้งาน</title>
+    <script src='https://static.line-scdn.net/liff/edge/2/sdk.js'></script>
+    <style>
+      :root { --navy:#16324f; --blue:#1f6feb; --green:#16864b; --red:#c9362b; --border:#d7dee7; }
+      * { box-sizing:border-box; }
+      body { margin:0; background:#f3f6fa; color:#17202b; font-family:system-ui,'Segoe UI',sans-serif; }
+      .page { width:min(1100px,100%); margin:auto; padding:20px; }
+      .header,.card { border:1px solid var(--border); border-radius:16px; background:#fff; box-shadow:0 8px 24px rgb(22 50 79 / 8%); }
+      .header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px; }
+      h1,h2,p { margin-top:0; } h1 { margin-bottom:6px; font-size:clamp(22px,5vw,30px); }
+      h2 { margin-bottom:16px; font-size:20px; } .muted { margin-bottom:0; color:#627083; }
+      .card { margin-top:16px; padding:20px; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      label { display:block; color:var(--navy); font-weight:650; }
+      input,select,button { width:100%; min-height:46px; margin-top:7px; border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:#fff; font:inherit; }
+      .check { display:flex; align-items:center; gap:9px; margin-top:27px; }
+      .check input { width:20px; min-height:20px; margin:0; }
+      .actions { display:flex; gap:10px; margin-top:16px; }
+      button { width:auto; cursor:pointer; border-color:transparent; background:var(--blue); color:#fff; font-weight:700; }
+      button.secondary { background:#e8eef6; color:var(--navy); } button:disabled { opacity:.55; }
+      .status { display:none; margin-top:16px; border-radius:10px; padding:12px; }
+      .status.show { display:block; } .info { background:#e9f2ff; color:#144f98; }
+      .success { background:#e5f6ed; color:var(--green); } .error { background:#fdecea; color:var(--red); }
+      .table-wrap { overflow-x:auto; } table { width:100%; border-collapse:collapse; white-space:nowrap; }
+      th,td { border-bottom:1px solid var(--border); padding:11px 10px; text-align:left; }
+      th { background:#f6f8fb; color:var(--navy); } .active { color:var(--green); } .inactive { color:var(--red); }
+      .edit { min-height:36px; margin:0; padding:6px 12px; } #app { display:none; }
+      @media(max-width:650px) { .page{padding:12px}.header,.card{padding:16px;border-radius:12px}.header,.actions{flex-direction:column;align-items:stretch}.grid{grid-template-columns:1fr}.check{margin-top:0}button{width:100%} }
+    </style>
+  </head>
+  <body>
+    <main class='page'>
+      <section class='header'>
+        <div><h1>จัดการผู้ใช้งาน</h1><p class='muted' id='signedInName'>กำลังตรวจสอบสิทธิ์ผ่าน LINE…</p></div>
+        <button class='secondary' id='refreshButton' type='button'>โหลดข้อมูลใหม่</button>
+      </section>
+      <div class='status info show' id='statusBox'>กำลังเชื่อมต่อ LINE…</div>
+      <div id='app'>
+        <section class='card'>
+          <h2>เพิ่มหรือแก้ไขผู้ใช้</h2>
+          <form id='userForm'>
+            <div class='grid'>
+              <label>LINE User ID<input id='lineUserId' required placeholder='Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'></label>
+              <label>ชื่อที่แสดงใน LINE<input id='lineDisplayName' maxlength='100'></label>
+              <label>ชื่อพนักงาน<input id='employeeName' maxlength='100'></label>
+              <label>รหัสพนักงาน<input id='employeeCode' maxlength='50'></label>
+              <label>ระดับสิทธิ์<select id='role'><option value='employee'>พนักงาน</option><option value='manager'>ผู้บริหาร</option></select></label>
+              <label class='check'><input id='active' type='checkbox' checked>เปิดใช้งานบัญชีนี้</label>
+            </div>
+            <div class='actions'>
+              <button id='saveButton' type='submit'>บันทึกผู้ใช้</button>
+              <button class='secondary' id='clearButton' type='button'>ล้างแบบฟอร์ม</button>
+            </div>
+          </form>
+        </section>
+        <section class='card'>
+          <h2>รายชื่อผู้ใช้งาน</h2>
+          <div class='table-wrap'>
+            <table>
+              <thead><tr><th>ชื่อพนักงาน</th><th>รหัส</th><th>ชื่อ LINE</th><th>สิทธิ์</th><th>สถานะ</th><th></th></tr></thead>
+              <tbody id='userRows'></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+    <iframe id='backendFrame' title='Apps Script backend' hidden></iframe>
+    <script>
+      const LIFF_ID = '2010715544-GvrOwi60';
+      const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbyESq3ElbNxq7bEyZDxIIWCB4xXOljDErmlL_7c5X8zu0nMCGEnjHRh0IuNytsaBwrUbg/exec';
+      const MESSAGE_SOURCE = 'line-access-frontend';
+      const BRIDGE_SOURCE = 'line-access-bridge';
+      const pending = new Map();
+      let idToken = '';
+      let users = [];
+      let bridgeWindow = null;
+      let requestNumber = 0;
+      let resolveBridge;
+      const bridgeReady = new Promise(resolve => { resolveBridge = resolve; });
+      const el = {};
+
+      ['app','statusBox','signedInName','userForm','userRows','refreshButton','saveButton',
+       'clearButton','lineUserId','lineDisplayName','employeeName','employeeCode','role','active',
+       'backendFrame'].forEach(id => { el[id] = document.getElementById(id); });
+
+      window.addEventListener('message', receiveBridgeMessage);
+      window.addEventListener('load', initialize);
+      el.userForm.addEventListener('submit', saveUser);
+      el.refreshButton.addEventListener('click', () => loadUsers().catch(() => {}));
+      el.clearButton.addEventListener('click', clearForm);
+
+      async function initialize() {
+        try {
+          el.backendFrame.src = BACKEND_URL;
+          await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
+          if (!liff.isLoggedIn()) throw new Error('กรุณาเข้าสู่ระบบ LINE แล้วเปิดใหม่');
+          idToken = liff.getIDToken();
+          if (!idToken) throw new Error('LINE ไม่ได้ส่ง ID token');
+          const profile = await liff.getProfile();
+          el.signedInName.textContent = 'เข้าสู่ระบบ: ' + profile.displayName;
+          await waitForBridge();
+          await loadUsers();
+          el.app.style.display = 'block';
+        } catch (error) {
+          showStatus(messageOf(error), 'error');
+        }
+      }
+
+      function receiveBridgeMessage(event) {
+        const data = event.data;
+        if (!data || data.source !== BRIDGE_SOURCE) return;
+        if (data.type === 'ready') {
+          bridgeWindow = event.source;
+          resolveBridge();
+          return;
+        }
+        if (data.type !== 'response' || event.source !== bridgeWindow) return;
+        const request = pending.get(data.id);
+        if (!request) return;
+        clearTimeout(request.timer);
+        pending.delete(data.id);
+        data.ok ? request.resolve(data.result) : request.reject(new Error(data.error));
+      }
+
+      function waitForBridge() {
+        return Promise.race([
+          bridgeReady,
+          new Promise((resolve, reject) => {
+            setTimeout(() => reject(new Error('เชื่อมต่อ Apps Script ไม่สำเร็จ')), 15000);
+          })
+        ]);
+      }
+
+      function callBackend(action, payload) {
+        return new Promise((resolve, reject) => {
+          const id = 'request-' + (++requestNumber);
+          const timer = setTimeout(() => {
+            pending.delete(id);
+            reject(new Error('Apps Script ตอบกลับช้าเกินกำหนด'));
+          }, 20000);
+          pending.set(id, { resolve: resolve, reject: reject, timer: timer });
+          bridgeWindow.postMessage({
+            source: MESSAGE_SOURCE,
+            id: id,
+            action: action,
+            idToken: idToken,
+            payload: payload || null
+          }, '*');
+        });
+      }
+
+      function loadUsers() {
+        setBusy(true);
+        showStatus('กำลังโหลดรายชื่อผู้ใช้งาน…', 'info');
+        return callBackend('getAccessUsers').then(result => {
+          users = result || [];
+          renderUsers();
+          showStatus('โหลดข้อมูล ' + users.length + ' รายการแล้ว', 'success');
+        }).catch(error => {
+          showStatus(messageOf(error), 'error');
+          throw error;
+        }).finally(() => setBusy(false));
+      }
+
+      function saveUser(event) {
+        event.preventDefault();
+        setBusy(true);
+        showStatus('กำลังบันทึกข้อมูล…', 'info');
+        const input = {
+          lineUserId: el.lineUserId.value,
+          lineDisplayName: el.lineDisplayName.value,
+          employeeName: el.employeeName.value,
+          employeeCode: el.employeeCode.value,
+          role: el.role.value,
+          active: el.active.checked
+        };
+        callBackend('saveAccessUser', input).then(() => {
+          clearForm();
+          return loadUsers();
+        }).catch(error => showStatus(messageOf(error), 'error'))
+          .finally(() => setBusy(false));
+      }
+
+      function renderUsers() {
+        el.userRows.replaceChildren();
+        if (!users.length) {
+          const cell = el.userRows.insertRow().insertCell();
+          cell.colSpan = 6;
+          cell.textContent = 'ยังไม่มีผู้ใช้งาน';
+          return;
+        }
+        users.forEach((user, index) => {
+          const row = el.userRows.insertRow();
+          addCell(row, user.employeeName || '-');
+          addCell(row, user.employeeCode || '-');
+          addCell(row, user.lineDisplayName || '-');
+          addCell(row, user.role === 'manager' ? 'ผู้บริหาร' : 'พนักงาน');
+          const status = addCell(row, user.active ? 'ใช้งาน' : 'ระงับ');
+          status.className = user.active ? 'active' : 'inactive';
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'edit';
+          button.textContent = 'แก้ไข';
+          button.addEventListener('click', () => editUser(index));
+          row.insertCell().appendChild(button);
+        });
+      }
+
+      function addCell(row, text) {
+        const cell = row.insertCell();
+        cell.textContent = text;
+        return cell;
+      }
+
+      function editUser(index) {
+        const user = users[index];
+        el.lineUserId.value = user.lineUserId;
+        el.lineDisplayName.value = user.lineDisplayName;
+        el.employeeName.value = user.employeeName;
+        el.employeeCode.value = user.employeeCode;
+        el.role.value = user.role;
+        el.active.checked = user.active;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function clearForm() {
+        el.userForm.reset();
+        el.active.checked = true;
+        el.role.value = 'employee';
+      }
+
+      function setBusy(value) {
+        el.saveButton.disabled = value;
+        el.refreshButton.disabled = value;
+      }
+
+      function showStatus(message, type) {
+        el.statusBox.textContent = message;
+        el.statusBox.className = 'status show ' + type;
+      }
+
+      function messageOf(error) {
+        return error && error.message ? error.message : String(error);
+      }
+    </script>
+  </body>
+</html>
