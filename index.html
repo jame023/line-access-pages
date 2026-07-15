@@ -30,6 +30,7 @@
       th,td { border-bottom:1px solid var(--border); padding:11px 10px; text-align:left; }
       th { background:#f6f8fb; color:var(--navy); } .active { color:var(--green); } .inactive { color:var(--red); }
       .edit { min-height:36px; margin:0; padding:6px 12px; } #app { display:none; }
+      .backend-frame { position:fixed; left:-10px; bottom:-10px; width:1px; height:1px; border:0; opacity:.01; pointer-events:none; }
       @media(max-width:650px) { .page{padding:12px}.header,.card{padding:16px;border-radius:12px}.header,.actions{flex-direction:column;align-items:stretch}.grid{grid-template-columns:1fr}.check{margin-top:0}button{width:100%} }
     </style>
   </head>
@@ -69,7 +70,7 @@
         </section>
       </div>
     </main>
-    <iframe id='backendFrame' title='Apps Script backend' hidden></iframe>
+    <iframe class='backend-frame' id='backendFrame' title='Apps Script backend'></iframe>
     <script>
       const LIFF_ID = '2010715544-GvrOwi60';
       const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbyESq3ElbNxq7bEyZDxIIWCB4xXOljDErmlL_7c5X8zu0nMCGEnjHRh0IuNytsaBwrUbg/exec';
