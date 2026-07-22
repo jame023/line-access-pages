@@ -30,13 +30,12 @@
     <main class='page'>
       <section class='card'>
         <h1>ลงทะเบียนพนักงาน</h1>
-        <p>กรอกชื่อและรหัสพนักงาน ระบบจะรับ LINE User ID จากบัญชีที่เปิดหน้านี้โดยอัตโนมัติ</p>
+        <p>กรอกชื่อพนักงาน ระบบจะรับ LINE User ID จากบัญชีที่เปิดหน้านี้โดยอัตโนมัติ</p>
         <div class='status info' id='statusBox'>กำลังเชื่อมต่อ LINE…</div>
         <div id='formArea'>
           <div class='line-name' id='lineName'></div>
           <form id='registerForm'>
             <label>ชื่อพนักงาน<input id='employeeName' maxlength='100' required autocomplete='name'></label>
-            <label>รหัสพนักงาน<input id='employeeCode' maxlength='8' required placeholder='EMP-0001' pattern='EMP-[0-9]{4}'></label>
             <button id='submitButton' type='submit'>ส่งคำขอลงทะเบียน</button>
           </form>
         </div>
@@ -61,16 +60,12 @@
         lineName: document.getElementById('lineName'),
         form: document.getElementById('registerForm'),
         employeeName: document.getElementById('employeeName'),
-        employeeCode: document.getElementById('employeeCode'),
         submitButton: document.getElementById('submitButton')
       };
 
       window.addEventListener('message', receiveBridgeMessage);
       window.addEventListener('load', initialize);
       el.form.addEventListener('submit', submitRegistration);
-      el.employeeCode.addEventListener('input', () => {
-        el.employeeCode.value = el.employeeCode.value.toUpperCase();
-      });
 
       async function initialize() {
         try {
@@ -135,8 +130,7 @@
         showStatus('กำลังส่งคำขอลงทะเบียน…', 'info');
         try {
           const result = await callBackend('registerMyAccess', {
-            employeeName: el.employeeName.value,
-            employeeCode: el.employeeCode.value
+            employeeName: el.employeeName.value
           });
           if (result.active) {
             showStatus('บัญชีนี้เปิดใช้งานแล้ว ไม่ต้องลงทะเบียนซ้ำ', 'success');
