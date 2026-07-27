@@ -180,9 +180,20 @@
           role: el.role.value,
           active: el.active.checked
         };
-        callBackend('saveAccessUser', input).then(() => {
+        callBackend('saveAccessUser', input).then(result => {
           clearForm();
-          return loadUsers();
+          return loadUsers().then(() => {
+            const menu = result && result.richMenu;
+            if (menu && menu.status === 'error') {
+              showStatus('บันทึกข้อมูลแล้ว แต่ผูก Rich Menu ไม่สำเร็จ: ' + menu.error, 'error');
+              return;
+            }
+            if (menu && menu.status === 'not-configured') {
+              showStatus('บันทึกข้อมูลแล้ว แต่ระบบ Rich Menu ยังไม่ได้ตั้งค่า', 'info');
+              return;
+            }
+            showStatus('บันทึกข้อมูลและตรวจสอบ Rich Menu แล้ว', 'success');
+          });
         }).catch(error => showStatus(messageOf(error), 'error'))
           .finally(() => setBusy(false));
       }
