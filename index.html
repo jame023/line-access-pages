@@ -17,7 +17,8 @@
       .card { margin-top:16px; padding:20px; }
       .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
       label { display:block; color:var(--navy); font-weight:650; }
-      input,select,button { width:100%; min-height:46px; margin-top:7px; border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:#fff; font:inherit; }
+      input,select,textarea,button { width:100%; min-height:46px; margin-top:7px; border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:#fff; font:inherit; }
+      textarea { min-height:150px; resize:vertical; line-height:1.55; }
       .check { display:flex; align-items:center; gap:9px; margin-top:27px; }
       .check input { width:20px; min-height:20px; margin:0; }
       .actions { display:flex; gap:10px; margin-top:16px; }
@@ -30,6 +31,12 @@
       th,td { border-bottom:1px solid var(--border); padding:11px 10px; text-align:left; }
       th { background:#f6f8fb; color:var(--navy); } .active { color:var(--green); } .inactive { color:var(--red); }
       .edit { min-height:36px; margin:0; padding:6px 12px; } #app { display:none; }
+      .broadcast-preview { display:none; margin-top:16px; border:1px solid #b9d3fa; border-radius:12px; padding:14px; background:#f4f8ff; }
+      .broadcast-preview.show { display:block; }
+      .broadcast-preview strong { display:block; color:var(--navy); }
+      .broadcast-preview pre { margin:10px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; line-height:1.55; }
+      .danger { background:var(--red); }
+      .counter { margin-top:7px; color:#627083; text-align:right; font-size:14px; }
       .backend-frame { position:fixed; left:-10px; bottom:-10px; width:1px; height:1px; border:0; opacity:.01; pointer-events:none; }
       @media(max-width:650px) { .page{padding:12px}.header,.card{padding:16px;border-radius:12px}.header,.actions{flex-direction:column;align-items:stretch}.grid{grid-template-columns:1fr}.check{margin-top:0}button{width:100%} }
     </style>
@@ -42,6 +49,23 @@
       </section>
       <div class='status info show' id='statusBox'>กำลังเชื่อมต่อ LINE…</div>
       <div id='app'>
+        <section class='card'>
+          <h2>แจ้งประกาศถึงทุกคน</h2>
+          <p class='muted'>ส่งข้อความถึงพนักงานและผู้บริหารที่เปิดใช้งานทั้งหมด</p>
+          <label>
+            ข้อความประกาศ
+            <textarea id='broadcastMessage' maxlength='1000' placeholder='เช่น แจ้งประชุมเวลา 15:00 น. ที่ห้องประชุม'></textarea>
+          </label>
+          <div class='counter'><span id='broadcastLength'>0</span>/1000 ตัวอักษร</div>
+          <div class='broadcast-preview' id='broadcastPreview'>
+            <strong id='broadcastRecipientSummary'></strong>
+            <pre id='broadcastPreviewText'></pre>
+          </div>
+          <div class='actions'>
+            <button class='secondary' id='previewBroadcastButton' type='button'>ดูตัวอย่างและจำนวนผู้รับ</button>
+            <button class='danger' id='sendBroadcastButton' type='button' disabled>ยืนยันส่งทุกคน</button>
+          </div>
+        </section>
         <section class='card'>
           <h2>เพิ่มหรือแก้ไขผู้ใช้</h2>
           <form id='userForm'>
@@ -79,6 +103,8 @@
       const pending = new Map();
       let idToken = '';
       let users = [];
+      let previewedBroadcastMessage = '';
+      let previewedRecipientCount = 0;
       let bridgeWindow = null;
       let requestNumber = 0;
       let resolveBridge;
@@ -87,13 +113,18 @@
 
       ['app','statusBox','signedInName','userForm','userRows','refreshButton','saveButton',
        'clearButton','lineUserId','lineDisplayName','employeeName','employeeCode','role','active',
-       'backendFrame'].forEach(id => { el[id] = document.getElementById(id); });
+       'backendFrame','broadcastMessage','broadcastLength','broadcastPreview',
+       'broadcastRecipientSummary','broadcastPreviewText','previewBroadcastButton',
+       'sendBroadcastButton'].forEach(id => { el[id] = document.getElementById(id); });
 
       window.addEventListener('message', receiveBridgeMessage);
       window.addEventListener('load', initialize);
       el.userForm.addEventListener('submit', saveUser);
       el.refreshButton.addEventListener('click', () => loadUsers().catch(() => {}));
       el.clearButton.addEventListener('click', clearForm);
+      el.broadcastMessage.addEventListener('input', handleBroadcastInput);
+      el.previewBroadcastButton.addEventListener('click', previewBroadcast);
+      el.sendBroadcastButton.addEventListener('click', sendBroadcast);
 
       async function initialize() {
         try {
@@ -198,6 +229,71 @@
           .finally(() => setBusy(false));
       }
 
+      function handleBroadcastInput() {
+        el.broadcastLength.textContent = el.broadcastMessage.value.length;
+        previewedBroadcastMessage = '';
+        previewedRecipientCount = 0;
+        el.broadcastPreview.classList.remove('show');
+        el.sendBroadcastButton.disabled = true;
+      }
+
+      async function previewBroadcast() {
+        const message = el.broadcastMessage.value.trim();
+        if (!message) {
+          showStatus('กรุณาพิมพ์ข้อความประกาศ', 'error');
+          return;
+        }
+        setBusy(true);
+        showStatus('กำลังตรวจสอบข้อความและรายชื่อผู้รับ…', 'info');
+        try {
+          const result = await callBackend('previewBroadcastMessage', { message: message });
+          previewedBroadcastMessage = result.message;
+          previewedRecipientCount = result.recipientCount;
+          el.broadcastRecipientSummary.textContent =
+            'ผู้รับทั้งหมด ' + result.recipientCount + ' คน';
+          el.broadcastPreviewText.textContent = result.message;
+          el.broadcastPreview.classList.add('show');
+          el.sendBroadcastButton.disabled = false;
+          showStatus('ตรวจตัวอย่างแล้ว กรุณาตรวจข้อความก่อนกดยืนยันส่ง', 'success');
+        } catch (error) {
+          showStatus(messageOf(error), 'error');
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function sendBroadcast() {
+        const message = el.broadcastMessage.value.trim();
+        if (!previewedBroadcastMessage || message !== previewedBroadcastMessage) {
+          showStatus('ข้อความมีการเปลี่ยนแปลง กรุณาดูตัวอย่างใหม่ก่อนส่ง', 'error');
+          handleBroadcastInput();
+          return;
+        }
+        if (!window.confirm(
+          'ยืนยันส่งข้อความนี้ถึงผู้ใช้งาน Active ทั้งหมด ' +
+          previewedRecipientCount + ' คนใช่หรือไม่?'
+        )) return;
+
+        setBusy(true);
+        showStatus('กำลังส่งประกาศ กรุณาอย่าปิดหน้านี้…', 'info');
+        try {
+          const result = await callBackend('sendBroadcastMessage', {
+            message: message,
+            confirmation: 'SEND_ALL_ACTIVE'
+          });
+          el.broadcastMessage.value = '';
+          handleBroadcastInput();
+          showStatus(
+            'ส่งประกาศสำเร็จ ' + result.recipientCount + ' คน เวลา ' + result.sentAt,
+            'success'
+          );
+        } catch (error) {
+          showStatus(messageOf(error), 'error');
+        } finally {
+          setBusy(false);
+        }
+      }
+
       function renderUsers() {
         el.userRows.replaceChildren();
         if (!users.length) {
@@ -249,6 +345,9 @@
       function setBusy(value) {
         el.saveButton.disabled = value;
         el.refreshButton.disabled = value;
+        el.previewBroadcastButton.disabled = value;
+        el.sendBroadcastButton.disabled = value ||
+          !previewedBroadcastMessage;
       }
 
       function showStatus(message, type) {
