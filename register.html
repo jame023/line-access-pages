@@ -14,8 +14,8 @@
       h1 { margin:0 0 8px; color:var(--navy); font-size:clamp(24px,7vw,32px); }
       p { margin:0 0 20px; color:#627083; line-height:1.6; }
       label { display:block; margin-top:16px; color:var(--navy); font-weight:700; }
-      input,button { width:100%; min-height:50px; margin-top:8px; border:1px solid var(--border); border-radius:10px; padding:11px 13px; font:inherit; }
-      input:focus { border-color:var(--blue); outline:3px solid rgb(31 111 235 / 13%); }
+      input,select,button { width:100%; min-height:50px; margin-top:8px; border:1px solid var(--border); border-radius:10px; padding:11px 13px; font:inherit; }
+      input:focus,select:focus { border-color:var(--blue); outline:3px solid rgb(31 111 235 / 13%); }
       button { margin-top:22px; cursor:pointer; border-color:transparent; background:var(--blue); color:#fff; font-weight:750; }
       button:disabled { cursor:wait; opacity:.55; }
       .line-name { margin:16px 0 0; border-radius:10px; padding:12px; background:#f3f6fa; color:var(--navy); }
@@ -23,6 +23,11 @@
       .info { background:#e9f2ff; color:#144f98; } .success { background:#e5f6ed; color:var(--green); } .error { background:#fdecea; color:var(--red); }
       .backend-frame { position:fixed; left:-10px; bottom:-10px; width:1px; height:1px; border:0; opacity:.01; pointer-events:none; }
       #formArea { display:none; }
+      fieldset { margin:18px 0 0; border:1px solid var(--border); border-radius:12px; padding:12px; }
+      legend { padding:0 6px; color:var(--navy); font-weight:750; }
+      .group-option { display:flex; align-items:center; gap:10px; min-height:46px; margin:0; font-weight:600; }
+      .group-option input { width:22px; min-height:22px; margin:0; }
+      .hint { margin:8px 0 0; font-size:14px; color:#627083; }
       @media(max-width:600px) { .page{padding:12px}.card{padding:18px;border-radius:12px} }
     </style>
   </head>
@@ -30,12 +35,25 @@
     <main class='page'>
       <section class='card'>
         <h1>ลงทะเบียนพนักงาน</h1>
-        <p>กรอกชื่อพนักงาน ระบบจะรับ LINE User ID จากบัญชีที่เปิดหน้านี้โดยอัตโนมัติ</p>
+        <p>กรอกชื่อและเลือกกลุ่มงาน ระบบจะรับ LINE User ID จากบัญชีที่เปิดหน้านี้โดยอัตโนมัติ</p>
         <div class='status info' id='statusBox'>กำลังเชื่อมต่อ LINE…</div>
         <div id='formArea'>
           <div class='line-name' id='lineName'></div>
           <form id='registerForm'>
             <label>ชื่อพนักงาน<input id='employeeName' maxlength='100' required autocomplete='name'></label>
+            <fieldset>
+              <legend>กลุ่มงาน (เลือกได้มากกว่า 1)</legend>
+              <label class='group-option'><input type='checkbox' name='workGroup' value='สกรีน'>สกรีน</label>
+              <label class='group-option'><input type='checkbox' name='workGroup' value='ผลิต'>ผลิต</label>
+              <label class='group-option'><input type='checkbox' name='workGroup' value='ขนส่ง'>ขนส่ง</label>
+              <label class='group-option'><input type='checkbox' name='workGroup' value='ออฟฟิต'>ออฟฟิต</label>
+              <p class='hint'>หากเลือกหลายกลุ่ม กรุณาระบุกลุ่มงานหลักสำหรับปฏิทินและรายงาน</p>
+            </fieldset>
+            <label>กลุ่มงานหลัก
+              <select id='primaryWorkGroup' required>
+                <option value=''>เลือกกลุ่มงานก่อน</option>
+              </select>
+            </label>
             <button id='submitButton' type='submit'>ส่งคำขอลงทะเบียน</button>
           </form>
         </div>
@@ -60,12 +78,14 @@
         lineName: document.getElementById('lineName'),
         form: document.getElementById('registerForm'),
         employeeName: document.getElementById('employeeName'),
+        primaryWorkGroup: document.getElementById('primaryWorkGroup'),
         submitButton: document.getElementById('submitButton')
       };
 
       window.addEventListener('message', receiveBridgeMessage);
       window.addEventListener('load', initialize);
       el.form.addEventListener('submit', submitRegistration);
+      el.form.addEventListener('change', updatePrimaryWorkGroupOptions);
 
       async function initialize() {
         try {
@@ -129,20 +149,48 @@
         el.submitButton.disabled = true;
         showStatus('กำลังส่งคำขอลงทะเบียน…', 'info');
         try {
+          const workGroups = selectedWorkGroups();
+          if (!workGroups.length) throw new Error('กรุณาเลือกกลุ่มงานอย่างน้อย 1 กลุ่ม');
           const result = await callBackend('registerMyAccess', {
-            employeeName: el.employeeName.value
+            employeeName: el.employeeName.value,
+            workGroups: workGroups,
+            primaryWorkGroup: el.primaryWorkGroup.value
           });
           if (result.active) {
             showStatus('บัญชีนี้เปิดใช้งานแล้ว ไม่ต้องลงทะเบียนซ้ำ', 'success');
           } else {
             showStatus('ส่งคำขอแล้ว กรุณารอผู้บริหารอนุมัติ', 'success');
             el.form.reset();
+            updatePrimaryWorkGroupOptions();
           }
         } catch (error) {
           showStatus(messageOf(error), 'error');
         } finally {
           el.submitButton.disabled = false;
         }
+      }
+
+      function selectedWorkGroups() {
+        return Array.from(el.form.querySelectorAll('input[name="workGroup"]:checked'))
+          .map(input => input.value);
+      }
+
+      function updatePrimaryWorkGroupOptions() {
+        const selected = selectedWorkGroups();
+        const previous = el.primaryWorkGroup.value;
+        el.primaryWorkGroup.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = selected.length ? 'เลือกกลุ่มงานหลัก' : 'เลือกกลุ่มงานก่อน';
+        el.primaryWorkGroup.appendChild(placeholder);
+        selected.forEach(workGroup => {
+          const option = document.createElement('option');
+          option.value = workGroup;
+          option.textContent = workGroup;
+          el.primaryWorkGroup.appendChild(option);
+        });
+        if (selected.includes(previous)) el.primaryWorkGroup.value = previous;
+        if (selected.length === 1) el.primaryWorkGroup.value = selected[0];
       }
 
       function showStatus(message, type) {
