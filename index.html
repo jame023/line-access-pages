@@ -6,39 +6,41 @@
     <title>จัดการผู้ใช้งาน</title>
     <script src='https://static.line-scdn.net/liff/edge/2/sdk.js'></script>
     <style>
-      :root { --navy:#16324f; --blue:#1f6feb; --green:#16864b; --red:#c9362b; --border:#d7dee7; }
+      :root { --navy:#0b2f67; --ink:#172b4d; --blue:#0b63ce; --blue-soft:#edf5ff; --green:#16864b; --red:#c9362b; --amber:#a85b00; --border:#d8e2ef; --surface:#f5f8fc; }
       * { box-sizing:border-box; }
-      body { margin:0; background:#f3f6fa; color:#17202b; font-family:system-ui,'Segoe UI',sans-serif; }
-      .page { width:min(1100px,100%); margin:auto; padding:20px; }
-      .header,.card { border:1px solid var(--border); border-radius:16px; background:#fff; box-shadow:0 8px 24px rgb(22 50 79 / 8%); }
-      .header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px; }
-      h1,h2,p { margin-top:0; } h1 { margin-bottom:6px; font-size:clamp(22px,5vw,30px); }
-      h2 { margin-bottom:16px; font-size:20px; } .muted { margin-bottom:0; color:#627083; }
-      .card { margin-top:16px; padding:20px; }
-      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-      label { display:block; color:var(--navy); font-weight:650; }
-      input,select,textarea,button { width:100%; min-height:46px; margin-top:7px; border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:#fff; font:inherit; }
+      body { margin:0; background:var(--surface); color:var(--ink); font-family:"Noto Sans Thai",system-ui,'Segoe UI',sans-serif; }
+      .page { width:min(1120px,100%); margin:auto; padding:20px; }
+      .header,.card { border:1px solid var(--border); border-radius:18px; background:#fff; box-shadow:0 10px 28px rgb(11 47 103 / 8%); }
+      .header { position:relative; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:24px; overflow:hidden; }
+      .header::before { content:""; position:absolute; inset:0 auto 0 0; width:6px; background:var(--blue); }
+      h1,h2,p { margin-top:0; } h1 { margin-bottom:6px; color:var(--navy); font-size:clamp(24px,5vw,32px); letter-spacing:-.02em; }
+      h2 { margin-bottom:16px; color:var(--navy); font-size:21px; letter-spacing:-.015em; } .muted { margin-bottom:0; color:#62728a; }
+      .card { margin-top:18px; padding:22px; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+      label { display:block; color:var(--navy); font-weight:700; }
+      input,select,textarea,button { width:100%; min-height:48px; margin-top:8px; border:1px solid var(--border); border-radius:11px; padding:11px 13px; background:#fff; color:var(--ink); font:inherit; transition:border-color .18s,box-shadow .18s; }
+      input:focus,select:focus,textarea:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb(11 99 206 / 14%); }
       textarea { min-height:150px; resize:vertical; line-height:1.55; }
       .check { display:flex; align-items:center; gap:9px; margin-top:27px; }
       .check input { width:20px; min-height:20px; margin:0; }
       .actions { display:flex; gap:10px; margin-top:16px; }
-      button { width:auto; cursor:pointer; border-color:transparent; background:var(--blue); color:#fff; font-weight:700; }
-      button.secondary { background:#e8eef6; color:var(--navy); } button:disabled { opacity:.55; }
-      .status { display:none; margin-top:16px; border-radius:10px; padding:12px; }
+      button { width:auto; cursor:pointer; border-color:transparent; background:var(--blue); color:#fff; font-weight:800; box-shadow:0 5px 12px rgb(11 99 206 / 18%); }
+      button.secondary { background:var(--blue-soft); color:var(--navy); box-shadow:none; } button:disabled { opacity:.55; cursor:not-allowed; }
+      .status { display:none; margin-top:16px; border-radius:11px; padding:13px 15px; border:1px solid transparent; }
       .status.show { display:block; } .info { background:#e9f2ff; color:#144f98; }
       .success { background:#e5f6ed; color:var(--green); } .error { background:#fdecea; color:var(--red); }
-      .table-wrap { overflow-x:auto; } table { width:100%; border-collapse:collapse; white-space:nowrap; }
-      th,td { border-bottom:1px solid var(--border); padding:11px 10px; text-align:left; }
-      th { background:#f6f8fb; color:var(--navy); } .active { color:var(--green); } .inactive { color:var(--red); }
+      .table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:12px; } table { width:100%; border-collapse:collapse; white-space:nowrap; }
+      th,td { border-bottom:1px solid var(--border); padding:13px 12px; text-align:left; } tbody tr:last-child td { border-bottom:0; } tbody tr:hover { background:#f8fbff; }
+      th { background:var(--blue-soft); color:var(--navy); font-size:14px; } .active { color:var(--green); font-weight:750; } .inactive { color:var(--red); font-weight:750; }
       .edit { min-height:36px; margin:0; padding:6px 12px; } #app { display:none; }
-      .broadcast-preview { display:none; margin-top:16px; border:1px solid #b9d3fa; border-radius:12px; padding:14px; background:#f4f8ff; }
+      .broadcast-preview { display:none; margin-top:16px; border:1px solid #b9d3fa; border-radius:12px; padding:15px; background:var(--blue-soft); }
       .broadcast-preview.show { display:block; }
       .broadcast-preview strong { display:block; color:var(--navy); }
       .broadcast-preview pre { margin:10px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; line-height:1.55; }
       .danger { background:var(--red); }
       .counter { margin-top:7px; color:#627083; text-align:right; font-size:14px; }
       .backend-frame { position:fixed; left:-10px; bottom:-10px; width:1px; height:1px; border:0; opacity:.01; pointer-events:none; }
-      @media(max-width:650px) { .page{padding:12px}.header,.card{padding:16px;border-radius:12px}.header,.actions{flex-direction:column;align-items:stretch}.grid{grid-template-columns:1fr}.check{margin-top:0}button{width:100%} }
+      @media(max-width:650px) { .page{padding:12px}.header,.card{padding:17px;border-radius:14px}.header,.actions{flex-direction:column;align-items:stretch}.grid{grid-template-columns:1fr}.check{margin-top:0}button{width:100%}.table-wrap{margin:0 -2px} }
     </style>
   </head>
   <body>
