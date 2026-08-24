@@ -5,6 +5,7 @@
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <title>ลงทะเบียนพนักงาน</title>
     <script src='https://static.line-scdn.net/liff/edge/2/sdk.js'></script>
+    <link rel='stylesheet' href='./tailwind.css'>
     <style>
       :root { --navy:#16324f; --blue:#1f6feb; --green:#16864b; --red:#c9362b; --border:#d7dee7; }
       * { box-sizing:border-box; }
@@ -34,7 +35,10 @@
   <body>
     <main class='page'>
       <section class='card'>
-        <h1>ลงทะเบียนพนักงาน</h1>
+        <div class='registration-brand'>
+          <div class='brand-logo'><img src='https://raw.githubusercontent.com/jame023/work-calendar-pages/main/assets/sip-iget-logo.png' alt='SIP I-GET'></div>
+          <div><span class='eyebrow'>LINE ACCESS</span><h1>ลงทะเบียนพนักงาน</h1></div>
+        </div>
         <p>กรอกชื่อและเลือกกลุ่มงาน ระบบจะรับ LINE User ID จากบัญชีที่เปิดหน้านี้โดยอัตโนมัติ</p>
         <div class='status info' id='statusBox'>กำลังเชื่อมต่อ LINE…</div>
         <div id='formArea'>

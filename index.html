@@ -5,6 +5,7 @@
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <title>จัดการผู้ใช้งาน</title>
     <script src='https://static.line-scdn.net/liff/edge/2/sdk.js'></script>
+    <link rel='stylesheet' href='./tailwind.css'>
     <style>
       :root { --navy:#0b2f67; --ink:#172b4d; --blue:#0b63ce; --blue-soft:#edf5ff; --green:#16864b; --red:#c9362b; --amber:#a85b00; --border:#d8e2ef; --surface:#f5f8fc; }
       * { box-sizing:border-box; }
@@ -46,7 +47,10 @@
   <body>
     <main class='page'>
       <section class='header'>
-        <div><h1>จัดการผู้ใช้งาน</h1><p class='muted' id='signedInName'>กำลังตรวจสอบสิทธิ์ผ่าน LINE…</p></div>
+        <div class='brand-lockup'>
+          <div class='brand-logo'><img src='https://raw.githubusercontent.com/jame023/work-calendar-pages/main/assets/sip-iget-logo.png' alt='SIP I-GET'></div>
+          <div><h1>จัดการผู้ใช้งาน</h1><p class='muted' id='signedInName'>กำลังตรวจสอบสิทธิ์ผ่าน LINE…</p></div>
+        </div>
         <button class='secondary' id='refreshButton' type='button'>โหลดข้อมูลใหม่</button>
       </section>
       <div class='status info show' id='statusBox'>กำลังเชื่อมต่อ LINE…</div>
