@@ -63,6 +63,9 @@
         </div>
       </section>
     </main>
+    <div class='loading-overlay' id='loadingOverlay' role='status' aria-live='polite' aria-hidden='true'>
+      <div class='loading-panel'><span class='loading-spinner' aria-hidden='true'></span><span>กำลังโหลดข้อมูล…</span></div>
+    </div>
     <iframe class='backend-frame' id='backendFrame' title='Apps Script backend'></iframe>
     <script>
       const LIFF_ID = '2010715544-GvrOwi60';
@@ -73,6 +76,9 @@
       let idToken = '';
       let resolveBridge;
       let requestNumber = 0;
+      let busyDepth = 0;
+      let busyShownAt = 0;
+      let busyHideTimer = 0;
       const pending = new Map();
       const bridgeReady = new Promise(resolve => { resolveBridge = resolve; });
       const el = {
@@ -92,6 +98,7 @@
       el.form.addEventListener('change', updatePrimaryWorkGroupOptions);
 
       async function initialize() {
+        setBusy(true);
         try {
           el.backendFrame.src = BACKEND_URL;
           await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
@@ -105,6 +112,8 @@
           showStatus('พร้อมลงทะเบียน', 'info');
         } catch (error) {
           showStatus(messageOf(error), 'error');
+        } finally {
+          setBusy(false);
         }
       }
 
@@ -150,6 +159,7 @@
 
       async function submitRegistration(event) {
         event.preventDefault();
+        setBusy(true);
         el.submitButton.disabled = true;
         showStatus('กำลังส่งคำขอลงทะเบียน…', 'info');
         try {
@@ -170,8 +180,32 @@
         } catch (error) {
           showStatus(messageOf(error), 'error');
         } finally {
+          setBusy(false);
           el.submitButton.disabled = false;
         }
+      }
+
+      function setBusy(value) {
+        const overlay = document.getElementById('loadingOverlay');
+        if (value) {
+          busyDepth += 1;
+          clearTimeout(busyHideTimer);
+          if (!overlay.classList.contains('show')) busyShownAt = performance.now();
+          overlay.classList.add('show');
+          overlay.setAttribute('aria-hidden', 'false');
+          document.body.classList.add('is-busy');
+          document.body.setAttribute('aria-busy', 'true');
+          return;
+        }
+        busyDepth = Math.max(0, busyDepth - 1);
+        if (busyDepth) return;
+        busyHideTimer = setTimeout(() => {
+          if (busyDepth) return;
+          overlay.classList.remove('show');
+          overlay.setAttribute('aria-hidden', 'true');
+          document.body.classList.remove('is-busy');
+          document.body.setAttribute('aria-busy', 'false');
+        }, Math.max(0, 650 - (performance.now() - busyShownAt)));
       }
 
       function selectedWorkGroups() {
